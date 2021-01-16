@@ -4,6 +4,7 @@ const fs = require("fs");
 var rimraf = require("rimraf");
 const chalk = require("chalk");
 const path = require("path");
+const EventEmitter = require("events");
 
 const WORKDIR = (p) => path.join("/tmp/strip-decode", p);
 
@@ -138,6 +139,8 @@ function awaitKeypress(msg) {
 
       console.log(chalk.yellowBright("Got challenge code. Searching..."));
 
+      let cancelEvent = new EventEmitter();
+
       let testResults = await Promise.all(
         repos.map(
           (repo) =>
@@ -149,7 +152,16 @@ function awaitKeypress(msg) {
                 WORKDIR(repo),
               ]);
 
-              test.on("exit", (code) => resolve(code));
+              let cancelListener = () => test.kill("SIGKILL");
+              cancelEvent.once("cancel", cancelListener);
+
+              test.on("exit", (code) => {
+                if (code === 0) {
+                  cancelEvent.removeListener("cancel", cancelListener);
+                  cancelEvent.emit("cancel");
+                }
+                resolve(code);
+              });
             })
         )
       );
