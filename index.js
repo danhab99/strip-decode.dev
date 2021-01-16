@@ -3,6 +3,9 @@ const { spawn, exec } = require("child_process");
 const fs = require("fs");
 var rimraf = require("rimraf");
 const chalk = require("chalk");
+const path = require("path");
+
+const WORKDIR = (p) => path.join("/tmp/strip-decode", p);
 
 function awaitKeypress(msg) {
   return new Promise((resolve) => {
@@ -20,7 +23,7 @@ function awaitKeypress(msg) {
 (async () => {
   const browser = await puppeteer.launch({
     headless: false,
-    userDataDir: "/tmp/strip-decode/.chrome",
+    userDataDir: WORKDIR(".chrome"),
   });
   const page = await browser.newPage();
   await page.goto("https://github.com/login");
@@ -84,7 +87,7 @@ function awaitKeypress(msg) {
     await Promise.all(
       repos.map((repo) => {
         return new Promise((resolve) => {
-          if (fs.existsSync(`/tmp/strip-decode/${repo}`)) {
+          if (fs.existsSync(WORKDIR(repo))) {
             console.log(chalk.blueBright("Already have"), repo);
             resolve();
           } else {
@@ -94,7 +97,7 @@ function awaitKeypress(msg) {
               "--depth",
               "1",
               `https://github.com/${repo}.git`,
-              `/tmp/strip-decode/${repo}`,
+              WORKDIR(repo),
             ]);
 
             git.on("exit", () => resolve());
@@ -114,7 +117,7 @@ function awaitKeypress(msg) {
         (repo) =>
           new Promise((resolve) => {
             let find = exec(`find . | grep "${filename}`, {
-              cwd: `/tmp/strip-decode/${repo}`,
+              cwd: WORKDIR(repo),
             });
 
             find.on("exit", (code) => resolve(code));
@@ -131,7 +134,7 @@ function awaitKeypress(msg) {
         )
       );
 
-      fs.writeFileSync("/tmp/pattern", challenge_code);
+      fs.writeFileSync(WORKDIR("pattern"), challenge_code);
 
       console.log(chalk.yellowBright("Got challenge code. Searching..."));
 
@@ -142,8 +145,8 @@ function awaitKeypress(msg) {
               console.log(chalk.yellow("Searching"), repo);
               let test = spawn("python3", [
                 "test.py",
-                "/tmp/pattern",
-                `/tmp/strip-decode/${repo}`,
+                WORKDIR("pattern"),
+                WORKDIR(repo),
               ]);
 
               test.on("exit", (code) => resolve(code));
