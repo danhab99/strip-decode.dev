@@ -2,6 +2,7 @@ const puppeteer = require("puppeteer");
 const { spawn, exec } = require("child_process");
 const fs = require("fs");
 var rimraf = require("rimraf");
+const chalk = require("chalk");
 
 function awaitKeypress(msg) {
   return new Promise((resolve) => {
@@ -17,7 +18,10 @@ function awaitKeypress(msg) {
 }
 
 (async () => {
-  const browser = await puppeteer.launch({ headless: false });
+  const browser = await puppeteer.launch({
+    headless: false,
+    userDataDir: "/tmp/strip-decode/.chrome",
+  });
   const page = await browser.newPage();
   await page.goto("https://github.com/login");
 
@@ -52,7 +56,7 @@ function awaitKeypress(msg) {
 
   await page.goto("https://stripcode.dev");
 
-  console.log("Playing game...");
+  console.log(chalk.greenBright.bold("Playing game..."));
 
   await clickButton("body > div > div > div > a");
   await page.waitForNavigation({});
@@ -66,7 +70,7 @@ function awaitKeypress(msg) {
 
     let repos = await Promise.all(choices.map((c) => innerText(c)));
 
-    console.log("Got new choices", repos);
+    console.log(chalk.cyanBright("Got new choices"), repos);
 
     let filename = await innerText(
       await page.$(
@@ -74,17 +78,17 @@ function awaitKeypress(msg) {
       )
     );
 
-    console.log("Challenge filename", filename);
+    console.log(chalk.cyanBright("Challenge filename"), filename);
 
-    console.log("Cloning all challenge repos");
+    console.log(chalk.yellowBright.underline("Cloning all challenge repos"));
     await Promise.all(
       repos.map((repo) => {
         return new Promise((resolve) => {
           if (fs.existsSync(`/tmp/strip-decode/${repo}`)) {
-            console.log("Already have ", repo);
+            console.log(chalk.blueBright("Already have"), repo);
             resolve();
           } else {
-            console.log("Cloning repo ", repo);
+            console.log(chalk.blue("Cloning repo"), repo);
             let git = spawn("git", [
               "clone",
               "--depth",
@@ -99,9 +103,9 @@ function awaitKeypress(msg) {
       })
     );
 
-    console.log("Done");
+    console.log(chalk.greenBright.underline("Done!"));
 
-    console.log("Pretesting...");
+    console.log(chalk.magentaBright("Pretesting..."));
 
     let correctAnswer;
 
@@ -119,7 +123,7 @@ function awaitKeypress(msg) {
     );
 
     if (pretest.filter((x) => x == 0).length !== 1) {
-      console.log("Pretest inconclusive");
+      console.log(chalk.red("Pretest inconclusive"));
 
       let challenge_code = await innerText(
         await page.$(
@@ -129,13 +133,13 @@ function awaitKeypress(msg) {
 
       fs.writeFileSync("/tmp/pattern", challenge_code);
 
-      console.log("Got challenge code. Searching...");
+      console.log(chalk.yellowBright("Got challenge code. Searching..."));
 
       let testResults = await Promise.all(
         repos.map(
           (repo) =>
             new Promise((resolve) => {
-              console.log("Searching", repo);
+              console.log(chalk.yellow("Searching"), repo);
               let test = spawn("python3", [
                 "test.py",
                 "/tmp/pattern",
@@ -149,15 +153,15 @@ function awaitKeypress(msg) {
 
       correctAnswer = testResults.indexOf(0);
     } else {
-      console.log("Pretest conclusive");
+      console.log(chalk.greenBright("Pretest conclusive"));
       correctAnswer = pretest.indexOf(0);
     }
 
     if (correctAnswer >= 0) {
-      console.log("Good answer", correctAnswer);
+      console.log(chalk.greenBright.bold("!!!Good answer!!!"), correctAnswer);
       await choices[correctAnswer].click();
     } else {
-      console.log("I failed");
+      console.log(chalk.gray("I failed"));
       await choices[Math.floor(Math.random() * 4)].click();
     }
 
